@@ -51,7 +51,7 @@ func baseProducer(ctx context.Context, conn *amqp.Connection) error {
 	return nil
 }
 
-func baseConsumer(ctx context.Context, conn *amqp.Connection) error {
+func baseConsumer(ctx context.Context, conn *amqp.Connection, consumerId int) error {
 	ch, err := conn.Channel()
 	if err != nil {
 		return err
@@ -83,6 +83,7 @@ mainLoop:
 			break mainLoop
 		case msg := <-msgs:
 			received := msg.Body
+			log.Println("Consumer id:", consumerId)
 			log.Println("Received msg:", string(received))
 			break mainLoop
 		}
@@ -90,3 +91,8 @@ mainLoop:
 
 	return err
 }
+
+var (
+	_ ProducerFunc = baseProducer
+	_ ConsumerFunc = baseConsumer
+)

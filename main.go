@@ -15,7 +15,7 @@ type (
 		Workers int
 	}
 	ProducerFunc func(ctx context.Context, conn *amqp.Connection) error
-	ConsumerFunc func(ctx context.Context, conn *amqp.Connection) error
+	ConsumerFunc func(ctx context.Context, conn *amqp.Connection, consumerId int) error
 )
 
 var (
@@ -34,6 +34,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
+	log.Println("Running:", config.Example, ", with worker count: ", config.Workers)
+
 	err := startProducersAndConsumers(ctx, conn, config)
 	if err != nil {
 		log.Fatalln(err)
@@ -45,15 +47,18 @@ func startProducersAndConsumers(
 	conn *amqp.Connection,
 	config *Config,
 ) (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
 
 	switch config.Example {
 	case Base:
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+
 		err = startConsumers(ctx, conn, baseProducer, baseConsumer, config.Workers)
-	//case Queues:
-	//	queuesProducer(conn)
-	//	startConsumers(context.Background(), queuesConsumer, config.Workers)
+	case Queues:
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+
+		err = startConsumers(ctx, conn, queuesProducer, queuesConsumer, config.Workers)
 	//case PubSub:
 	//	pubsubProducer(conn)
 	//	startConsumers(context.Background(), pubsubConsumer, config.Workers)
@@ -79,16 +84,14 @@ func startConsumers(ctx context.Context, conn *amqp.Connection, p ProducerFunc, 
 		return p(ctx, conn)
 	})
 	for i := 0; i < workerAmount; i++ {
+		i := i
 		g.Go(func() error {
-			return c(ctx, conn)
+			return c(ctx, conn, i)
 		})
 	}
 
 	return g.Wait()
 }
-
-func queuesProducer(conn *amqp.Connection)                      {}
-func queuesConsumer(ctx context.Context, conn *amqp.Connection) {}
 
 func pubsubProducer(conn *amqp.Connection)                      {}
 func pubsubConsumer(ctx context.Context, conn *amqp.Connection) {}
